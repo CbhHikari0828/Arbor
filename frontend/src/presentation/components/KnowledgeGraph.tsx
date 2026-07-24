@@ -31,7 +31,7 @@ export function KnowledgeGraph({
   onSelectNode,
 }: KnowledgeGraphProps) {
   return (
-    <section className="relative min-h-0 flex-1 overflow-hidden bg-[#fffdf9] transition-colors duration-300 dark:bg-[#0b1117]">
+    <section className="relative min-h-0 flex-1 overflow-hidden bg-[#f7f7f7] transition-colors duration-300 dark:bg-[#0b1117]">
       <ReactFlow
         key={canvasId}
         className="arbor-flow"
@@ -49,7 +49,7 @@ export function KnowledgeGraph({
         onNodeClick={(_, node) => onSelectNode(node.id)}
       >
         <Background
-          color={isDarkMode ? "#27313a" : "#e6e0d7"}
+          color={isDarkMode ? "#27313a" : "#dedede"}
           gap={20}
           size={1.2}
           variant={BackgroundVariant.Dots}

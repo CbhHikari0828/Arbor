@@ -14,8 +14,14 @@ import {
   SunMedium,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  FormEvent,
+  KeyboardEvent,
+  MouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from "react";
 import { NavLink } from "react-router-dom";
 import type { KnowledgeNode } from "@/domain/knowledge/types";
 
@@ -27,6 +33,39 @@ interface NodeTreePanelProps {
   isCreatingRootNode: boolean;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
+}
+
+const DEFAULT_SIDEBAR_WIDTH = 258;
+const MIN_SIDEBAR_WIDTH = 220;
+const MIN_COMPACT_SIDEBAR_WIDTH = 160;
+const MAX_SIDEBAR_WIDTH = 420;
+const MIN_WORKSPACE_WIDTH = 720;
+const SIDEBAR_WIDTH_STORAGE_KEY = "arbor-sidebar-width";
+
+function getMinimumSidebarWidth() {
+  if (typeof window === "undefined") {
+    return MIN_SIDEBAR_WIDTH;
+  }
+
+  return Math.max(
+    MIN_COMPACT_SIDEBAR_WIDTH,
+    Math.min(MIN_SIDEBAR_WIDTH, window.innerWidth - MIN_WORKSPACE_WIDTH),
+  );
+}
+
+function getMaximumSidebarWidth() {
+  if (typeof window === "undefined") {
+    return MAX_SIDEBAR_WIDTH;
+  }
+
+  return Math.max(
+    getMinimumSidebarWidth(),
+    Math.min(MAX_SIDEBAR_WIDTH, window.innerWidth - MIN_WORKSPACE_WIDTH),
+  );
+}
+
+function clampSidebarWidth(width: number) {
+  return Math.min(Math.max(width, getMinimumSidebarWidth()), getMaximumSidebarWidth());
 }
 
 export function NodeTreePanel({
@@ -43,9 +82,97 @@ export function NodeTreePanel({
   const [isRenamingNewNode, setIsRenamingNewNode] = useState(false);
   const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(() => new Set());
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window === "undefined") {
+      return DEFAULT_SIDEBAR_WIDTH;
+    }
+
+    const storedWidth = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    const parsedWidth = storedWidth ? Number.parseFloat(storedWidth) : Number.NaN;
+
+    return Number.isFinite(parsedWidth) ? clampSidebarWidth(parsedWidth) : clampSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+  });
+  const [isResizing, setIsResizing] = useState(false);
   const draftInputRef = useRef<HTMLInputElement>(null);
   const isSubmittingDraftRef = useRef(false);
   const isCancellingDraftRef = useRef(false);
+  const resizeStartRef = useRef<{ clientX: number; pointerId: number; width: number } | null>(null);
+  const dragStyleRef = useRef<{ cursor: string; userSelect: string } | null>(null);
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      setSidebarWidth((currentWidth) => clampSidebarWidth(currentWidth));
+    };
+
+    window.addEventListener("resize", handleWindowResize);
+
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, []);
+
+  const restoreDragStyles = useCallback(() => {
+    const previousStyles = dragStyleRef.current;
+
+    if (!previousStyles) {
+      return;
+    }
+
+    document.body.style.cursor = previousStyles.cursor;
+    document.body.style.userSelect = previousStyles.userSelect;
+    dragStyleRef.current = null;
+  }, []);
+
+  const stopResizing = useCallback(
+    (pointerId?: number) => {
+      const resizeStart = resizeStartRef.current;
+
+      if (pointerId !== undefined && resizeStart?.pointerId !== pointerId) {
+        return;
+      }
+
+      resizeStartRef.current = null;
+      restoreDragStyles();
+      setIsResizing(false);
+    },
+    [restoreDragStyles],
+  );
+
+  const resizeFromPointer = useCallback((clientX: number, pointerId: number) => {
+    const resizeStart = resizeStartRef.current;
+
+    if (!resizeStart || pointerId !== resizeStart.pointerId) {
+      return;
+    }
+
+    setSidebarWidth(clampSidebarWidth(resizeStart.width + clientX - resizeStart.clientX));
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => resizeFromPointer(event.clientX, event.pointerId);
+    const handlePointerUp = (event: PointerEvent) => stopResizing(event.pointerId);
+    const handleWindowBlur = () => stopResizing();
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    window.addEventListener("blur", handleWindowBlur);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      window.removeEventListener("blur", handleWindowBlur);
+      resizeStartRef.current = null;
+      restoreDragStyles();
+    };
+  }, [isResizing, resizeFromPointer, restoreDragStyles, stopResizing]);
 
   useEffect(() => {
     if (!isRenamingNewNode) {
@@ -123,36 +250,97 @@ export function NodeTreePanel({
     });
   };
 
+  const handleResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !event.isPrimary) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.focus();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeStartRef.current = {
+      clientX: event.clientX,
+      pointerId: event.pointerId,
+      width: sidebarWidth,
+    };
+    dragStyleRef.current = {
+      cursor: document.body.style.cursor,
+      userSelect: document.body.style.userSelect,
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    setIsResizing(true);
+  };
+
+  const handleResizePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    resizeFromPointer(event.clientX, event.pointerId);
+  };
+
+  const handleResizePointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    stopResizing(event.pointerId);
+  };
+
+  const handleResizeKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const widthByKey: Record<string, number> = {
+      ArrowLeft: -16,
+      ArrowRight: 16,
+    };
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      setSidebarWidth(getMinimumSidebarWidth());
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      setSidebarWidth(getMaximumSidebarWidth());
+      return;
+    }
+
+    const widthDelta = widthByKey[event.key];
+
+    if (widthDelta === undefined) {
+      return;
+    }
+
+    event.preventDefault();
+    setSidebarWidth((currentWidth) => clampSidebarWidth(currentWidth + widthDelta));
+  };
+
   return (
-    <aside className="flex h-full w-[258px] shrink-0 flex-col border-r border-[#ece6dc] bg-[#fbfaf7] px-4 pb-4 pt-6 transition-colors duration-300 dark:border-[#27313a] dark:bg-[#090d12]">
+    <aside
+      className="relative flex h-full shrink-0 flex-col border-r border-[#d8d8d8] bg-[#f7f7f7] px-4 pb-4 pt-6 transition-colors duration-300 dark:border-[#27313a] dark:bg-[#090d12]"
+      style={{ width: sidebarWidth }}
+    >
       <div className="mb-9 flex items-start justify-between px-2">
         <div className="flex items-center gap-3">
-          <div className="grid size-8 place-items-center text-[#c77815] dark:text-[#61b979]">
+          <div aria-label="Arbor 标志" className="grid size-8 place-items-center text-[#111111] dark:text-[#61b979]" role="img">
             <Leaf size={31} strokeWidth={1.9} />
           </div>
           <div>
             <h1 className="text-[28px] font-semibold leading-7 tracking-[-0.02em] text-[#191919] dark:text-[#f4f7f5]">
               Arbor
             </h1>
-            <p className="mt-1 text-xs tracking-[0.08em] text-[#5f655d] dark:text-[#98a49f]">
+            <p className="mt-1 text-xs tracking-[0.08em] text-[#666666] dark:text-[#98a49f]">
               AI 知识工作台
             </p>
           </div>
         </div>
       </div>
 
-      <nav className="mb-7 space-y-1.5 text-[14px] text-[#222724] dark:text-[#e3e9e5]">
+      <nav className="mb-7 space-y-1.5 text-[14px] text-[#222222] dark:text-[#e3e9e5]">
         <SidebarLink icon={<Home size={16} />} label="首页" to="/workspace" />
         <SidebarLink icon={<BookOpen size={16} />} label="我的知识库" to="/library" />
         <SidebarLink icon={<Star size={16} />} label="收藏夹" to="/favorites" />
         <SidebarLink icon={<Trash2 size={16} />} label="回收站" to="/trash" />
       </nav>
 
-      <div className="mb-3 flex items-center justify-between px-2 text-sm text-[#3f453f] dark:text-[#d7dfda]">
+      <div className="mb-3 flex items-center justify-between px-2 text-sm text-[#444444] dark:text-[#d7dfda]">
         <span>知识树</span>
         <button
           aria-label="新建知识树"
-          className="grid size-7 place-items-center rounded-md text-[#1d3029] transition hover:bg-[#f0ebe3] dark:text-[#d7dfda] dark:hover:bg-[#151c24]"
+          className="grid size-7 place-items-center rounded-md text-[#111111] transition hover:bg-[#e9e9e9] dark:text-[#d7dfda] dark:hover:bg-[#151c24]"
           onClick={startCreateRootNode}
           type="button"
         >
@@ -166,7 +354,7 @@ export function NodeTreePanel({
             <input
               ref={draftInputRef}
               aria-label="根节点名称"
-              className="h-10 w-full rounded-xl border border-[#1f7a5b] bg-white px-3 text-sm font-medium text-[#1f2933] shadow-sm outline-none dark:border-[#4d8d5f] dark:bg-[#111820] dark:text-[#edf3ef]"
+              className="h-10 w-full rounded-xl border border-[#111111] bg-white px-3 text-sm font-medium text-[#111111] shadow-sm outline-none dark:border-[#4d8d5f] dark:bg-[#111820] dark:text-[#edf3ef]"
               disabled={isSubmittingDraft || isCreatingRootNode}
               onBlur={() => void submitDraft()}
               onChange={(event) => setDraftTitle(event.target.value)}
@@ -195,14 +383,41 @@ export function NodeTreePanel({
 
       <div className="mt-5 flex items-center justify-between px-2">
         <div className="relative">
-          <div className="size-10 overflow-hidden rounded-full bg-[#e7ddcf] dark:bg-[#d8d2c8]">
-            <div className="mx-auto mt-2 size-6 rounded-full bg-[#f2c6a8]" />
-            <div className="mx-auto mt-1 h-5 w-8 rounded-t-full bg-[#24543f]" />
+          <div className="size-10 overflow-hidden rounded-full bg-[#dddddd] dark:bg-[#d8d2c8]">
+            <div className="mx-auto mt-2 size-6 rounded-full bg-[#bdbdbd]" />
+            <div className="mx-auto mt-1 h-5 w-8 rounded-t-full bg-[#2b2b2b]" />
           </div>
-          <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#fbfaf7] bg-[#8ca244] dark:border-[#090d12]" />
+          <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#f7f7f7] bg-[#111111] dark:border-[#090d12]" />
         </div>
         <ThemeSwitch isDarkMode={isDarkMode} onToggleDarkMode={onToggleDarkMode} />
         <FooterButton icon={<Settings size={19} />} label="设置" />
+      </div>
+
+      <div
+        aria-label="调整侧栏宽度"
+        aria-orientation="vertical"
+        aria-valuemax={getMaximumSidebarWidth()}
+        aria-valuemin={getMinimumSidebarWidth()}
+        aria-valuenow={Math.round(sidebarWidth)}
+        className="group absolute inset-y-0 -right-1.5 z-20 w-3 cursor-col-resize touch-none outline-none focus-visible:bg-[#ececec] dark:focus-visible:bg-[#15271d]"
+        onKeyDown={handleResizeKeyDown}
+        onLostPointerCapture={handleResizePointerEnd}
+        onPointerCancel={handleResizePointerEnd}
+        onPointerDown={handleResizePointerDown}
+        onPointerMove={handleResizePointerMove}
+        onPointerUp={handleResizePointerEnd}
+        role="separator"
+        tabIndex={0}
+        title="拖动调整侧栏宽度"
+      >
+        <span
+          aria-hidden="true"
+          className={`absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors ${
+            isResizing
+              ? "bg-[#111111] dark:bg-[#62c487]"
+              : "bg-transparent group-hover:bg-[#777777] group-focus:bg-[#111111] dark:group-hover:bg-[#4d765e] dark:group-focus:bg-[#62c487]"
+          }`}
+        />
       </div>
     </aside>
   );
@@ -215,8 +430,8 @@ function SidebarLink({ icon, label, to }: { icon: ReactNode; label: string; to: 
         [
           "flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left transition",
           isActive
-            ? "bg-[#e9efe9] font-medium text-[#174f42] dark:bg-[#17231d] dark:text-[#b9e2c5]"
-            : "hover:bg-[#f0ebe3] dark:hover:bg-[#151c24]",
+            ? "bg-[#e9e9e9] font-medium text-[#111111] dark:bg-[#17231d] dark:text-[#b9e2c5]"
+            : "hover:bg-[#eeeeee] dark:hover:bg-[#151c24]",
         ].join(" ")
       }
       end
@@ -265,8 +480,8 @@ function TreeRow({
         className={[
           "group flex h-10 w-full items-center gap-2 rounded-lg pr-2 text-left text-sm transition",
           isSelected
-            ? "bg-[#eef1ec] font-semibold text-[#163d31] dark:bg-[#151c24] dark:text-[#f3f7f4]"
-            : "text-[#262b28] hover:bg-[#f3eee7] dark:text-[#cdd6d1] dark:hover:bg-[#121920]",
+            ? "bg-[#e9e9e9] font-semibold text-[#111111] dark:bg-[#151c24] dark:text-[#f3f7f4]"
+            : "text-[#262626] hover:bg-[#eeeeee] dark:text-[#cdd6d1] dark:hover:bg-[#121920]",
         ].join(" ")}
         aria-expanded={children.length > 0 ? isExpanded : undefined}
         onClick={handleRowClick}
@@ -282,13 +497,13 @@ function TreeRow({
             ].join(" ")}
             data-tree-toggle
           >
-            <ChevronDown size={14} className="text-[#1c332b] dark:text-[#d5ded8]" />
+            <ChevronDown size={14} className="text-[#333333] dark:text-[#d5ded8]" />
           </span>
         ) : (
           <span className="w-3.5 shrink-0" />
         )}
         {isRoot ? (
-          <Network size={16} className="shrink-0 text-[#165a45] dark:text-[#d6ede0]" />
+          <Network size={16} className="shrink-0 text-[#222222] dark:text-[#d6ede0]" />
         ) : (
           <FileText size={16} className="shrink-0 text-[#343936] dark:text-[#d6ded9]" />
         )}
@@ -299,7 +514,7 @@ function TreeRow({
       </button>
 
       {children.length > 0 && isExpanded ? (
-        <div className="relative ml-5 border-l border-[#e3ddd3] dark:border-[#2b343d]">
+        <div className="relative ml-5 border-l border-[#d8d8d8] dark:border-[#2b343d]">
           {children.map((child) => (
             <TreeRow
               key={child.id}
@@ -321,29 +536,29 @@ function TreeRow({
 
 function GrowthCard() {
   return (
-    <div className="mt-5 overflow-hidden rounded-xl border border-[#ebe2d7] bg-white px-4 py-4 shadow-[0_18px_40px_rgba(54,41,23,0.08)] transition-colors duration-300 dark:border-[#303a44] dark:bg-[#111820] dark:shadow-[0_18px_45px_rgba(0,0,0,0.28)]">
-      <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-[#1f3029] dark:text-[#edf3ef]">
-        <Sparkle size={16} className="text-[#1f7a5b] dark:text-[#61b979]" />
+    <div className="mt-5 overflow-hidden rounded-xl border border-[#d8d8d8] bg-white px-4 py-4 shadow-[0_18px_40px_rgba(0,0,0,0.08)] transition-colors duration-300 dark:border-[#303a44] dark:bg-[#111820] dark:shadow-[0_18px_45px_rgba(0,0,0,0.28)]">
+      <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-[#222222] dark:text-[#edf3ef]">
+        <Sparkle size={16} className="text-[#111111] dark:text-[#61b979]" />
         今日成长
       </div>
-      <div className="space-y-2 text-sm text-[#2d322f] dark:text-[#e7eee9]">
+      <div className="space-y-2 text-sm text-[#333333] dark:text-[#e7eee9]">
         <p>
-          新增节点 <span className="ml-1 font-semibold text-[#c9792f] dark:text-[#f0b84f]">3</span>
+          新增节点 <span className="ml-1 font-semibold text-[#111111] dark:text-[#f0b84f]">3</span>
         </p>
         <p>
-          AI 总结完成 <span className="ml-1 font-semibold text-[#c9792f] dark:text-[#f0b84f]">2</span>
+          AI 总结完成 <span className="ml-1 font-semibold text-[#111111] dark:text-[#f0b84f]">2</span>
         </p>
         <p>
-          连接推荐 <span className="ml-1 font-semibold text-[#c9792f] dark:text-[#f0b84f]">1</span>
+          连接推荐 <span className="ml-1 font-semibold text-[#111111] dark:text-[#f0b84f]">1</span>
         </p>
       </div>
 
       <div className="relative -mb-5 ml-auto mt-1 h-16 w-24 dark:hidden">
-        <div className="absolute bottom-0 right-0 h-6 w-20 rounded-t-[60%] bg-[#d6c6a9]" />
-        <div className="absolute bottom-4 right-9 h-10 w-1.5 rounded-full bg-[#8f865b]" />
-        <span className="absolute bottom-8 right-7 size-4 rounded-full bg-[#aeb98d]" />
-        <span className="absolute bottom-5 right-14 size-3 rounded-full bg-[#c8d0ad]" />
-        <span className="absolute bottom-2 right-6 size-3 rounded-full bg-[#c8d0ad]" />
+        <div className="absolute bottom-0 right-0 h-6 w-20 rounded-t-[60%] bg-[#d2d2d2]" />
+        <div className="absolute bottom-4 right-9 h-10 w-1.5 rounded-full bg-[#777777]" />
+        <span className="absolute bottom-8 right-7 size-4 rounded-full bg-[#9c9c9c]" />
+        <span className="absolute bottom-5 right-14 size-3 rounded-full bg-[#b8b8b8]" />
+        <span className="absolute bottom-2 right-6 size-3 rounded-full bg-[#b8b8b8]" />
       </div>
 
       <div className="mt-2 hidden h-16 items-end gap-3 border-b border-[#36404a] px-1 dark:flex">
@@ -381,7 +596,7 @@ function ThemeSwitch({
   return (
     <button
       aria-label={isDarkMode ? "切换到浅色模式" : "切换到黑暗模式"}
-      className="flex h-10 items-center gap-1 rounded-full bg-[#f1ece5] p-1 text-[#1f2724] transition dark:bg-[#111820] dark:text-[#dce5df]"
+      className="flex h-10 items-center gap-1 rounded-full bg-[#e9e9e9] p-1 text-[#1f1f1f] transition dark:bg-[#111820] dark:text-[#dce5df]"
       onClick={onToggleDarkMode}
       type="button"
     >
@@ -396,7 +611,7 @@ function ThemeSwitch({
       <span
         className={[
           "grid size-8 place-items-center rounded-full transition",
-          isDarkMode ? "bg-[#222a33] shadow-[0_8px_18px_rgba(0,0,0,0.25)]" : "text-[#6d746f]",
+          isDarkMode ? "bg-[#222a33] shadow-[0_8px_18px_rgba(0,0,0,0.25)]" : "text-[#666666]",
         ].join(" ")}
       >
         <Moon size={18} fill={isDarkMode ? "currentColor" : "none"} />
@@ -409,7 +624,7 @@ function FooterButton({ icon, label }: { icon: ReactNode; label: string }) {
   return (
     <button
       aria-label={label}
-      className="grid size-9 place-items-center rounded-lg text-[#1f2724] transition hover:bg-[#f0ebe3] dark:text-[#dce5df] dark:hover:bg-[#151c24]"
+      className="grid size-9 place-items-center rounded-lg text-[#1f1f1f] transition hover:bg-[#e9e9e9] dark:text-[#dce5df] dark:hover:bg-[#151c24]"
       type="button"
     >
       {icon}

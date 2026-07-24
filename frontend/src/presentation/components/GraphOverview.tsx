@@ -88,7 +88,7 @@ export function GraphOverview({ nodes, edges, isDarkMode }: GraphOverviewProps) 
                 key={edge.id}
                 d={path}
                 fill="none"
-                stroke={isSummaryEdge ? (isDarkMode ? "#f0b84f" : "#c77718") : isDarkMode ? "#61b979" : "#1f7a5b"}
+                stroke={isSummaryEdge ? (isDarkMode ? "#f0b84f" : "#8a8a8a") : isDarkMode ? "#61b979" : "#303030"}
                 strokeDasharray={isSummaryEdge ? "4 3" : undefined}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -126,7 +126,7 @@ export function GraphOverview({ nodes, edges, isDarkMode }: GraphOverviewProps) 
             pointerEvents="none"
             rx={2}
             ry={2}
-            stroke={isDarkMode ? "#8ea59a" : "#c77718"}
+            stroke={isDarkMode ? "#8ea59a" : "#111111"}
             strokeWidth={1}
             width={(flowWidth / zoom) * layout.scale}
             x={layout.translateX + viewportX * layout.scale}
@@ -181,20 +181,20 @@ function getNodePresentation(node: OverviewNode, isDarkMode: boolean) {
 
   if (data.isActive) {
     return {
-      fill: isDarkMode ? "#4f9564" : "#2d8061",
-      stroke: isDarkMode ? "#b9dfc0" : "#174f42",
+      fill: isDarkMode ? "#4f9564" : "#202020",
+      stroke: isDarkMode ? "#b9dfc0" : "#111111",
     };
   }
 
   if (data.status === "summarized") {
     return {
-      fill: isDarkMode ? "#a56d24" : "#e1a243",
-      stroke: isDarkMode ? "#f0b84f" : "#c77718",
+      fill: isDarkMode ? "#a56d24" : "#9a9a9a",
+      stroke: isDarkMode ? "#f0b84f" : "#5f5f5f",
     };
   }
 
   return {
-    fill: isDarkMode ? "#33404a" : "#d7d9d1",
-    stroke: isDarkMode ? "#73838d" : "#c77718",
+    fill: isDarkMode ? "#33404a" : "#d7d7d7",
+    stroke: isDarkMode ? "#73838d" : "#777777",
   };
 }

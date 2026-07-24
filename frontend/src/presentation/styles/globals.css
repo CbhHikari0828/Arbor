@@ -3,24 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --background: 40 39% 95%;
-  --foreground: 150 8% 10%;
-  --muted: 32 28% 94%;
-  --muted-foreground: 100 4% 38%;
-  --border: 33 29% 88%;
+  --background: 0 0% 96%;
+  --foreground: 0 0% 7%;
+  --muted: 0 0% 94%;
+  --muted-foreground: 0 0% 39%;
+  --border: 0 0% 86%;
   --card: 0 0% 100%;
-  --canvas: 40 100% 99%;
-  --primary: 158 49% 22%;
+  --canvas: 0 0% 98%;
+  --primary: 0 0% 9%;
   --primary-foreground: 0 0% 100%;
-  --accent: 29 59% 49%;
-  --accent-soft: 31 48% 92%;
-  --edge-primary: #1f745e;
-  --edge-accent: #c9792f;
-  --edge-label-bg: #fffdf9;
-  --edge-label-text: #66716b;
-  --shadow-soft: 0 18px 45px rgba(31, 41, 51, 0.08);
-  --shadow-app: 0 22px 70px rgba(47, 39, 29, 0.08);
-  color: #1f2933;
+  --accent: 0 0% 18%;
+  --accent-soft: 0 0% 92%;
+  --edge-primary: #303030;
+  --edge-accent: #7a7a7a;
+  --edge-label-bg: #ffffff;
+  --edge-label-text: #626262;
+  --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.08);
+  --shadow-app: 0 22px 70px rgba(0, 0, 0, 0.08);
+  color: #111111;
   background: hsl(var(--background));
   font-family:
     Inter, "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, -apple-system,
@@ -67,7 +67,7 @@ body {
   margin: 0;
   background:
     radial-gradient(circle at 22% 6%, rgba(255, 255, 255, 0.95), transparent 34%),
-    linear-gradient(135deg, #fbfaf7 0%, #f6f1e9 100%);
+    linear-gradient(135deg, #ffffff 0%, #f3f3f3 100%);
 }
 
 html[data-theme="dark"] body {
@@ -92,7 +92,7 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(31, 122, 91, 0.18);
+  background: rgba(0, 0, 0, 0.14);
 }
 
 ::-webkit-scrollbar {
@@ -101,7 +101,7 @@ button:disabled {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #ddd5ca;
+  background: #d1d1d1;
   border-radius: 999px;
 }
 
@@ -119,8 +119,8 @@ html[data-theme="dark"] ::-webkit-scrollbar-thumb {
 
 .arbor-flow .react-flow__renderer {
   background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.42), transparent 58%),
-    #fffdf9;
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.5), transparent 58%),
+    #f7f7f7;
 }
 
 html[data-theme="dark"] .arbor-flow .react-flow__renderer {
@@ -134,10 +134,10 @@ html[data-theme="dark"] .arbor-flow .react-flow__renderer {
   flex-direction: column;
   gap: 0;
   overflow: hidden;
-  border: 1px solid #e8e1d8;
+  border: 1px solid #d8d8d8;
   border-radius: 12px;
   background: #ffffff;
-  box-shadow: 0 16px 35px rgba(47, 39, 29, 0.1);
+  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.1);
 }
 
 html[data-theme="dark"] .react-flow__controls.arbor-controls {
@@ -150,9 +150,9 @@ html[data-theme="dark"] .react-flow__controls.arbor-controls {
   width: 42px;
   height: 42px;
   border: 0;
-  border-bottom: 1px solid #ece6dd;
+  border-bottom: 1px solid #e1e1e1;
   background: #ffffff;
-  color: #222824;
+  color: #1a1a1a;
 }
 
 html[data-theme="dark"] .react-flow__controls.arbor-controls button {
@@ -166,7 +166,7 @@ html[data-theme="dark"] .react-flow__controls.arbor-controls button {
 }
 
 .react-flow__controls.arbor-controls button:hover {
-  background: #f7f3ed;
+  background: #f0f0f0;
 }
 
 html[data-theme="dark"] .react-flow__controls.arbor-controls button:hover {
@@ -174,11 +174,11 @@ html[data-theme="dark"] .react-flow__controls.arbor-controls button:hover {
 }
 
 .arbor-minimap {
-  border: 1px solid #e8e1d8;
+  border: 1px solid #d8d8d8;
   border-radius: 12px;
   background: #ffffff;
   box-sizing: content-box;
-  box-shadow: 0 16px 35px rgba(47, 39, 29, 0.08);
+  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 

@@ -5,7 +5,6 @@ import {
   MoreHorizontal,
   Search,
   SlidersHorizontal,
-  Star,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
@@ -75,16 +74,9 @@ export function WorkspacePage() {
                   <ChevronLeft size={20} />
                 </button>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h1 className="truncate text-[21px] font-semibold tracking-[-0.01em] text-foreground dark:text-[#f4f7f5]">
-                      {workspace.selectedNode?.title ?? "Arbor 最小可行产品"}
-                    </h1>
-                    <Star
-                      size={19}
-                      className="shrink-0 text-muted-foreground/65 dark:text-[#c4ccc8]"
-                      strokeWidth={1.6}
-                    />
-                  </div>
+                  <h1 className="truncate text-[21px] font-semibold tracking-[-0.01em] text-foreground dark:text-[#f4f7f5]">
+                    {workspace.selectedNode?.title ?? "Arbor 最小可行产品"}
+                  </h1>
                   <p className="mt-1 truncate text-sm text-muted-foreground dark:text-[#a8b2ad]">
                     {workspace.selectedNode?.description ?? "产品核心目标与最小可行动能集合"}
                   </p>
