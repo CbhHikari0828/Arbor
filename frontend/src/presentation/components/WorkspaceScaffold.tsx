@@ -43,7 +43,7 @@ export function WorkspaceScaffold({ children }: WorkspaceScaffoldProps) {
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode((value) => !value)}
       />
-      <section className="min-w-0 flex-1">{children(workspace)}</section>
+      <section className="min-h-0 min-w-0 flex-1">{children(workspace)}</section>
     </main>
   );
 }

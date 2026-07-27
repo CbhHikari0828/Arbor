@@ -104,7 +104,7 @@ const branches: DiscussionBranch[] = [
         id: "msg-root-2",
         role: "assistant",
         content:
-          "### 核心区别\n\nArbor 保存的是 **知识节点** 和 **节点总结**，聊天只是探索知识的一种方式。\n\n- 普通聊天应用更关注连续对话本身。\n- Arbor 更关注知识的组织、关联、沉淀与演化。\n- 每次讨论都可以反哺当前节点，让内容逐步变成可复用的知识资产。\n\n> 简单说：聊天是过程，知识树才是结果。",
+          "### 核心区别\n\nArbor 保存的是 **知识节点** 和 **节点总结**，聊天只是探索知识的一种方式。\n\n- 普通聊天应用更关注连续对话本身。\n- Arbor 更关注知识的组织、关联、沉淀与演化。\n- 每次讨论都可以反哺当前节点，让内容逐步变成可复用的知识资产。\n\n```ts\ntype KnowledgeAsset = {\n  nodeId: string;\n  summary: string;\n  tags: string[];\n};\n\nconst saveInsight = async (asset: KnowledgeAsset) => {\n  // 聊天产生过程，节点保存结果\n  return repository.upsertSummary(asset.nodeId, asset.summary);\n};\n```\n\n> 简单说：聊天是过程，知识树才是结果。",
         createdAt: "2026-07-23T10:23:00.000Z",
       },
     ],

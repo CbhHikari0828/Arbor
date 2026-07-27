@@ -61,9 +61,9 @@ export function WorkspacePage() {
         onToggleDarkMode={() => setIsDarkMode((value) => !value)}
       />
 
-      <section className="min-w-0 flex-1">
+      <section className="min-h-0 min-w-0 flex-1">
         <div className="relative grid h-full min-w-0 grid-cols-[minmax(0,1fr)_346px] overflow-hidden border border-border/80 bg-card transition-colors duration-300 dark:border-[#27313a] dark:bg-[#0b1016]">
-          <section className="flex min-w-0 flex-col">
+          <section className="flex min-h-0 min-w-0 flex-col">
             <header className="flex h-[96px] shrink-0 items-center justify-between border-b border-border/70 bg-white/95 px-6 transition-colors duration-300 dark:border-[#202b34] dark:bg-[#0b1016]/95">
               <div className="flex min-w-0 items-center gap-4">
                 <button

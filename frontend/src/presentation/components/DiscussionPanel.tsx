@@ -1,15 +1,13 @@
 ﻿import {
-  Bot,
   Maximize2,
   Minimize2,
   PlusCircle,
   SendHorizontal,
-  Sparkles,
-  UserRound,
 } from "lucide-react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useState } from "react";
+import type { KeyboardEvent } from "react";
 import type { DiscussionBranch } from "@/domain/knowledge/types";
 import { MarkdownMessage } from "@/presentation/components/MarkdownMessage";
 
@@ -40,7 +38,7 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
     editorProps: {
       attributes: {
         class:
-          "min-h-[70px] px-4 py-3 text-sm leading-6 text-[#222222] outline-none dark:text-[#e7eee9]",
+          "max-h-[132px] min-h-[70px] overflow-y-auto px-4 py-3 text-sm leading-6 text-[#222222] outline-none dark:text-[#e7eee9]",
       },
     },
   });
@@ -63,11 +61,35 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
   const isAssistantStreaming = Boolean(
     assistantMessage && streamedAssistantContent.length < assistantMessage.content.length,
   );
+  const handleSendPrompt = () => {
+    const prompt = editor?.getText().trim();
+
+    if (!editor || !prompt) {
+      return;
+    }
+
+    editor.commands.clearContent();
+    setIsEditorEmpty(true);
+  };
+  const handleEditorKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (event.ctrlKey) {
+      editor?.chain().focus().setHardBreak().run();
+      return;
+    }
+
+    handleSendPrompt();
+  };
 
   return (
     <aside
       className={[
-        "flex h-full min-w-0 flex-col bg-[#f7f7f7] transition-colors duration-300 dark:bg-[#0b1016]",
+        "flex h-full max-h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[#f7f7f7] transition-colors duration-300 dark:bg-[#0b1016]",
         isMaximized
           ? "absolute inset-0 z-20 w-full"
           : "w-[346px] shrink-0 border-l border-[#d8d8d8] dark:border-[#27313a]",
@@ -96,41 +118,38 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
         </button>
       </div>
 
-      <div className={["min-h-0 flex-1 overflow-y-auto", isMaximized ? "px-8 py-8" : "px-5 py-6"].join(" ")}>
-        <div className={[isMaximized ? "mx-auto w-full max-w-[920px]" : "", "space-y-6"].join(" ")}>
+      {isMaximized ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute right-8 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-end gap-1.5 md:flex"
+        >
+          <span className="h-px w-4 rounded-full bg-[#b8b8b8] dark:bg-[#53606a]" />
+          <span className="h-px w-3 rounded-full bg-[#9f9f9f] dark:bg-[#68757f]" />
+          <span className="h-px w-5 rounded-full bg-[#1f1f1f] dark:bg-[#e8eee9]" />
+          <span className="h-px w-3 rounded-full bg-[#9f9f9f] dark:bg-[#68757f]" />
+          <span className="h-px w-4 rounded-full bg-[#b8b8b8] dark:bg-[#53606a]" />
+        </div>
+      ) : null}
+
+      <div
+        className={[
+          "min-h-0 flex-1 basis-0 overflow-y-auto overscroll-contain",
+          isMaximized ? "px-8 py-8" : "px-5 py-6",
+        ].join(" ")}
+      >
+        <div className={[isMaximized ? "mx-auto w-full max-w-[920px]" : "w-full", "space-y-6 text-left"].join(" ")}>
         {userMessage ? (
-          <article className="group flex items-start gap-3 text-sm text-[#1f1f1f] dark:text-[#e7eee9]">
-            <div className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-[#111111] text-white shadow-sm dark:bg-[#1d3326] dark:text-[#9bd4aa]">
-              <UserRound size={16} strokeWidth={1.9} />
-            </div>
-            <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md bg-[#eeeeee] px-4 py-3 shadow-[0_8px_20px_rgba(0,0,0,0.045)] dark:bg-[#121a22] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
-              <div className="mb-1 flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold text-[#111111] dark:text-[#eef3ef]">你</p>
-                <time className="shrink-0 text-[11px] tabular-nums text-[#777777] dark:text-[#9aa6a1]">
-                  {formatTime(userMessage.createdAt)}
-                </time>
-              </div>
+          <article className="group flex w-full items-start justify-end text-sm text-[#1f1f1f] dark:text-[#e7eee9]">
+            <div className="min-w-0 max-w-[78%] rounded-2xl rounded-tr-md bg-[#eeeeee] px-4 py-3.5 text-left shadow-[0_8px_20px_rgba(0,0,0,0.045)] dark:bg-[#121a22] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
               <p className="leading-6 text-[#222222] dark:text-[#e7eee9]">{userMessage.content}</p>
             </div>
           </article>
         ) : null}
 
         {assistantMessage ? (
-          <article className="group flex items-start gap-3 text-sm text-[#202020] dark:text-[#eef3ef]">
-            <div className="mt-1 grid size-8 shrink-0 place-items-center rounded-full border border-[#d8d8d8] bg-white text-[#111111] shadow-sm dark:border-[#52606b] dark:bg-[#18212a] dark:text-[#f0b84f]">
-              <Bot size={16} strokeWidth={1.9} />
-            </div>
+          <article className="group flex w-full items-start justify-start text-left text-sm text-[#202020] dark:text-[#eef3ef]">
             <div className="min-w-0 flex-1">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  <p className="text-xs font-semibold text-[#111111] dark:text-[#eef3ef]">Arbor</p>
-                  <Sparkles size={13} className="text-[#111111] dark:text-[#f0b84f]" fill="currentColor" />
-                </div>
-                <time className="shrink-0 text-[11px] tabular-nums text-[#777777] dark:text-[#9aa6a1]">
-                  {formatTime(assistantMessage.createdAt)}
-                </time>
-              </div>
-              <div className="rounded-2xl rounded-tl-md border border-[#d8d8d8] bg-white px-4 py-4 shadow-[0_12px_30px_rgba(0,0,0,0.055)] dark:border-[#303a44] dark:bg-[#10161d] dark:shadow-[0_18px_42px_rgba(0,0,0,0.28)]">
+              <div className="pt-1 pr-1">
                 <MarkdownMessage content={streamedAssistantContent} />
                 {isAssistantStreaming ? (
                   <span
@@ -157,11 +176,11 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
         ].join(" ")}
       >
         <div className="rounded-xl border border-[#d8d8d8] bg-white shadow-[0_12px_34px_rgba(0,0,0,0.05)] transition-colors duration-300 dark:border-[#303a44] dark:bg-[#10161d] dark:shadow-[0_18px_45px_rgba(0,0,0,0.28)]">
-          <div className="relative">
+          <div className="relative" onKeyDown={handleEditorKeyDown}>
             <EditorContent editor={editor} />
             {isEditorEmpty ? (
               <span className="pointer-events-none absolute left-4 top-3 text-sm text-[#999999] dark:text-[#7f8a86]">
-                继续提问...（Shift + Enter 换行）
+                继续提问...（Enter 发送，Ctrl + Enter 换行）
               </span>
             ) : null}
           </div>
@@ -196,6 +215,7 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
             <button
               aria-label="发送"
               className="grid size-10 place-items-center rounded-full bg-[#111111] text-white shadow-[0_10px_24px_rgba(0,0,0,0.25)] transition hover:bg-[#2a2a2a] dark:bg-[#4b8a5c] dark:shadow-[0_14px_30px_rgba(33,91,53,0.36)] dark:hover:bg-[#5ba66e]"
+              onClick={handleSendPrompt}
               type="button"
             >
               <SendHorizontal size={18} fill="currentColor" />
@@ -205,14 +225,6 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
       </div>
     </aside>
   );
-}
-
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
 }
 
 function useStreamingText(content: string, streamKey: string) {
