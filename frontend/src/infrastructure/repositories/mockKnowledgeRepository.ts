@@ -104,7 +104,7 @@ const branches: DiscussionBranch[] = [
         id: "msg-root-2",
         role: "assistant",
         content:
-          "产品保存的是知识节点和节点总结，聊天只是探索知识的一种方式。它更关注知识的组织、关联、沉淀与演化，而不是连续对话本身。",
+          "### 核心区别\n\nArbor 保存的是 **知识节点** 和 **节点总结**，聊天只是探索知识的一种方式。\n\n- 普通聊天应用更关注连续对话本身。\n- Arbor 更关注知识的组织、关联、沉淀与演化。\n- 每次讨论都可以反哺当前节点，让内容逐步变成可复用的知识资产。\n\n> 简单说：聊天是过程，知识树才是结果。",
         createdAt: "2026-07-23T10:23:00.000Z",
       },
     ],
@@ -126,7 +126,7 @@ const branches: DiscussionBranch[] = [
         id: "msg-branch-2",
         role: "assistant",
         content:
-          "每个分支都应该保持上下文隔离，绑定到一个知识节点，并且可以从某条历史回答重新开始。",
+          "### 分支工作方式\n\n每个分支都应该保持 **上下文隔离**，并绑定到一个知识节点。\n\n1. 从某条历史回答重新开始。\n2. 只携带相关上下文，避免污染主线。\n3. 分支成熟后，再沉淀回节点总结。\n\n```ts\nbranch.context = collectRelevantMessages(nodeId)\n```\n\n这样可以同时探索多个方向，而不把主讨论搅乱。",
         createdAt: "2026-07-23T10:40:00.000Z",
       },
     ],
@@ -342,4 +342,3 @@ function layoutSubtree(rootNodeId: string) {
     });
   });
 }
-

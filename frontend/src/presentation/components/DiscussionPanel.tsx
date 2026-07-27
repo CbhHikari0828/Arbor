@@ -11,6 +11,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useState } from "react";
 import type { DiscussionBranch } from "@/domain/knowledge/types";
+import { MarkdownMessage } from "@/presentation/components/MarkdownMessage";
 
 interface DiscussionPanelProps {
   branch: DiscussionBranch | undefined;
@@ -55,6 +56,13 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
 
   const userMessage = branch?.messages.find((message) => message.role === "user");
   const assistantMessage = branch?.messages.find((message) => message.role === "assistant");
+  const streamedAssistantContent = useStreamingText(
+    assistantMessage?.content ?? "",
+    assistantMessage?.id ?? branch?.id ?? "empty-message",
+  );
+  const isAssistantStreaming = Boolean(
+    assistantMessage && streamedAssistantContent.length < assistantMessage.content.length,
+  );
 
   return (
     <aside
@@ -123,7 +131,13 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
                 </time>
               </div>
               <div className="rounded-2xl rounded-tl-md border border-[#d8d8d8] bg-white px-4 py-4 shadow-[0_12px_30px_rgba(0,0,0,0.055)] dark:border-[#303a44] dark:bg-[#10161d] dark:shadow-[0_18px_42px_rgba(0,0,0,0.28)]">
-                <p className="leading-7">{assistantMessage.content}</p>
+                <MarkdownMessage content={streamedAssistantContent} />
+                {isAssistantStreaming ? (
+                  <span
+                    aria-label="AI 正在输出"
+                    className="mt-2 inline-block h-4 w-1.5 animate-pulse rounded-full bg-[#111111] align-middle dark:bg-[#61b979]"
+                  />
+                ) : null}
               </div>
             </div>
           </article>
@@ -199,4 +213,38 @@ function formatTime(value: string) {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(value));
+}
+
+function useStreamingText(content: string, streamKey: string) {
+  const [visibleText, setVisibleText] = useState("");
+
+  useEffect(() => {
+    setVisibleText("");
+  }, [streamKey]);
+
+  useEffect(() => {
+    if (!content) {
+      setVisibleText("");
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setVisibleText((currentText) => {
+        if (currentText === content) {
+          window.clearInterval(intervalId);
+          return currentText;
+        }
+
+        if (!content.startsWith(currentText)) {
+          return content.slice(0, Math.min(content.length, 8));
+        }
+
+        return content.slice(0, Math.min(content.length, currentText.length + 8));
+      });
+    }, 24);
+
+    return () => window.clearInterval(intervalId);
+  }, [content, streamKey]);
+
+  return visibleText;
 }
