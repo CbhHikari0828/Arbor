@@ -1,7 +1,10 @@
 mod config;
 mod db;
+mod domain;
 mod error;
+mod repositories;
 mod routes;
+mod services;
 mod state;
 
 use std::net::SocketAddr;
@@ -20,7 +23,10 @@ async fn main() -> anyhow::Result<()> {
 
     let config = AppConfig::from_env()?;
     let db_pool = db::create_pool(&config.database_url).await?;
-    let state = AppState::new(db_pool);
+    db::run_migrations(&db_pool).await?;
+    info!("Database migrations applied");
+
+    let state = AppState::new(config.clone(), db_pool);
 
     let app = routes::router(state)
         .layer(TraceLayer::new_for_http())

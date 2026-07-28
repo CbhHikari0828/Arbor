@@ -9,11 +9,16 @@ use tracing::error;
 pub enum AppError {
     #[error("database error")]
     Database(#[from] sqlx::Error),
+    #[error("bad request: {0}")]
+    BadRequest(&'static str),
+    #[error("not found: {0}")]
+    NotFound(&'static str),
 }
 
 #[derive(Serialize)]
 struct ErrorResponse {
     error: &'static str,
+    detail: Option<&'static str>,
 }
 
 impl IntoResponse for AppError {
@@ -22,12 +27,20 @@ impl IntoResponse for AppError {
 
         let status = match self {
             AppError::Database(_) => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            AppError::NotFound(_) => StatusCode::NOT_FOUND,
+        };
+
+        let detail = match self {
+            AppError::BadRequest(detail) | AppError::NotFound(detail) => Some(detail),
+            AppError::Database(_) => None,
         };
 
         (
             status,
             Json(ErrorResponse {
                 error: "request_failed",
+                detail,
             }),
         )
             .into_response()
