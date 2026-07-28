@@ -1,5 +1,4 @@
 import {
-  ChevronLeft,
   Expand,
   Home,
   MoreHorizontal,
@@ -8,6 +7,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useWorkspaceController } from "@/application/useWorkspaceController";
 import { DiscussionPanel } from "@/presentation/components/DiscussionPanel";
 import { KnowledgeGraph } from "@/presentation/components/KnowledgeGraph";
@@ -15,6 +15,9 @@ import { NodeTreePanel } from "@/presentation/components/NodeTreePanel";
 
 export function WorkspacePage() {
   const workspace = useWorkspaceController();
+  const [searchParams] = useSearchParams();
+  const requestedBranchId = searchParams.get("branch");
+  const requestedNodeId = searchParams.get("node");
   const [isDiscussionMaximized, setIsDiscussionMaximized] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window === "undefined") {
@@ -29,6 +32,15 @@ export function WorkspacePage() {
     document.documentElement.dataset.theme = isDarkMode ? "dark" : "light";
     window.localStorage.setItem("arbor-theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const targetBranch = workspace.snapshot?.branches.find((branch) => branch.id === requestedBranchId);
+    const targetNodeId = requestedNodeId ?? targetBranch?.nodeId;
+    if (targetNodeId && workspace.snapshot?.nodes.some((node) => node.id === targetNodeId)) {
+      workspace.selectNode(targetNodeId);
+      workspace.focusGraphNodes([targetNodeId]);
+    }
+  }, [requestedBranchId, requestedNodeId, workspace.focusGraphNodes, workspace.selectNode, workspace.snapshot]);
 
   if (workspace.isLoading) {
     return (
@@ -64,15 +76,8 @@ export function WorkspacePage() {
       <section className="min-h-0 min-w-0 flex-1">
         <div className="relative grid h-full min-w-0 grid-cols-[minmax(0,1fr)_346px] overflow-hidden border border-border/80 bg-card transition-colors duration-300 dark:border-[#27313a] dark:bg-[#0b1016]">
           <section className="flex min-h-0 min-w-0 flex-col">
-            <header className="flex h-[96px] shrink-0 items-center justify-between border-b border-border/70 bg-white/95 px-6 transition-colors duration-300 dark:border-[#202b34] dark:bg-[#0b1016]/95">
-              <div className="flex min-w-0 items-center gap-4">
-                <button
-                  aria-label="返回"
-                  className="grid size-8 shrink-0 place-items-center rounded-full text-foreground transition hover:bg-muted dark:text-[#eef3ef] dark:hover:bg-[#151c24]"
-                  type="button"
-                >
-                  <ChevronLeft size={20} />
-                </button>
+            <header className="absolute left-5 top-5 z-10">
+              <div className="hidden">
                 <div className="min-w-0">
                   <h1 className="truncate text-[21px] font-semibold tracking-[-0.01em] text-foreground dark:text-[#f4f7f5]">
                     {workspace.selectedNode?.title ?? "Arbor 最小可行产品"}
@@ -83,7 +88,7 @@ export function WorkspacePage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 [&>button:not(:first-child)]:hidden">
                 <HeaderIconButton label="搜索" icon={<Search size={21} strokeWidth={1.8} />} />
                 <HeaderIconButton
                   label="筛选"

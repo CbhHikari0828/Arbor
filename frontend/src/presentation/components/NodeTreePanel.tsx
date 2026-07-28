@@ -7,6 +7,7 @@ import {
   Moon,
   MoreHorizontal,
   Network,
+  NotebookPen,
   Plus,
   Settings,
   Sparkle,
@@ -332,6 +333,7 @@ export function NodeTreePanel({
       <nav className="mb-7 space-y-1.5 text-[14px] text-[#222222] dark:text-[#e3e9e5]">
         <SidebarLink icon={<Home size={16} />} label="首页" to="/workspace" />
         <SidebarLink icon={<BookOpen size={16} />} label="我的知识库" to="/library" />
+        <SidebarLink icon={<NotebookPen size={16} />} label="笔记" to="/notes" />
         <SidebarLink icon={<Star size={16} />} label="收藏夹" to="/favorites" />
         <SidebarLink icon={<Trash2 size={16} />} label="回收站" to="/trash" />
       </nav>
@@ -622,12 +624,19 @@ function ThemeSwitch({
 
 function FooterButton({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <button
+    <NavLink
       aria-label={label}
-      className="grid size-9 place-items-center rounded-lg text-[#1f1f1f] transition hover:bg-[#e9e9e9] dark:text-[#dce5df] dark:hover:bg-[#151c24]"
-      type="button"
+      className={({ isActive }) =>
+        `grid size-9 place-items-center rounded-lg transition ${
+          isActive
+            ? "bg-[#e9e9e9] text-[#111111] dark:bg-[#17231d] dark:text-[#b9e2c5]"
+            : "text-[#1f1f1f] hover:bg-[#e9e9e9] dark:text-[#dce5df] dark:hover:bg-[#151c24]"
+        }`
+      }
+      title={label}
+      to="/settings"
     >
       {icon}
-    </button>
+    </NavLink>
   );
 }

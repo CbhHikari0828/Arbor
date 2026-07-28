@@ -216,3 +216,57 @@ html[data-theme="dark"] .react-flow__edge-text {
 .ProseMirror p {
   margin: 0;
 }
+
+@keyframes arbor-rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes arbor-soft-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(17, 17, 17, 0); }
+  50% { box-shadow: 0 0 0 5px rgba(17, 17, 17, 0.06); }
+}
+
+.arbor-page-enter > div > header {
+  animation: arbor-rise-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.arbor-page-enter > div > section {
+  animation: arbor-rise-in 440ms 80ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.arbor-page-enter article {
+  animation: arbor-rise-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.arbor-page-enter article:hover {
+  background: rgba(0, 0, 0, 0.018);
+  transform: translateX(3px);
+}
+
+.arbor-page-enter form {
+  animation: arbor-rise-in 440ms 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.arbor-page-enter input,
+.arbor-page-enter select {
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.arbor-page-enter input:focus,
+.arbor-page-enter select:focus {
+  animation: arbor-soft-pulse 700ms ease-out;
+}
+
+html[data-theme="dark"] .arbor-page-enter article:hover { background: rgba(255, 255, 255, 0.035); }
+
+@media (prefers-reduced-motion: reduce) {
+  .arbor-page-enter > div > header,
+  .arbor-page-enter > div > section,
+  .arbor-page-enter article,
+  .arbor-page-enter form,
+  .arbor-page-enter input:focus,
+  .arbor-page-enter select:focus { animation: none; }
+  .arbor-page-enter article { transition: none; }
+}
