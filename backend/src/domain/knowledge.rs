@@ -68,3 +68,14 @@ pub struct WorkspaceSnapshot {
     pub branches: Vec<DiscussionBranch>,
     pub summaries: Vec<KnowledgeSummary>,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeletedKnowledgeNode {
+    pub id: Uuid,
+    pub title: String,
+    pub parent_title: Option<String>,
+    pub description: String,
+    pub tags: Vec<String>,
+    pub deleted_at: DateTime<Utc>,
+}

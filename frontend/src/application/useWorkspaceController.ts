@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import { MarkerType } from "@xyflow/react";
 import type { Edge, Node } from "@xyflow/react";
@@ -20,7 +20,7 @@ interface WorkspaceState {
 
 const useWorkspaceState = create<WorkspaceState>((set) => ({
   selectedNodeId: "node-root",
-  favoriteNodeIds: new Set(["node-context", "node-summary"]),
+  favoriteNodeIds: new Set(),
   setSelectedNodeId: (nodeId) => set({ selectedNodeId: nodeId }),
   toggleFavoriteNode: (nodeId) =>
     set((state) => {
@@ -78,6 +78,10 @@ export function useWorkspaceController(): WorkspaceController {
     removeFavoriteNodes,
   } = useWorkspaceState();
   const queryClient = useQueryClient();
+  useEffect(() => {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081";
+    fetch(`${apiBaseUrl}/api/nodes/favorites`).then((response) => response.ok ? response.json() : []).then((ids) => useWorkspaceState.setState({ favoriteNodeIds: new Set(ids as string[]) })).catch(() => undefined);
+  }, []);
   const [graphFocusRequest, setGraphFocusRequest] = useState<{
     nodeIds: string[];
     targetId: string;
@@ -271,6 +275,12 @@ export function useWorkspaceController(): WorkspaceController {
     [selectedNode?.id, snapshot?.edges, visibleNodeIds],
   );
 
+  const persistFavorite = (nodeId: string) => {
+    const isFavorite = !favoriteNodeIds.has(nodeId);
+    toggleFavoriteNode(nodeId);
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081";
+    void fetch(`${apiBaseUrl}/api/nodes/${nodeId}/favorite`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isFavorite }) });
+  };
   return {
     snapshot,
     isLoading: workspaceQuery.isLoading,
@@ -280,7 +290,7 @@ export function useWorkspaceController(): WorkspaceController {
     graphNodes,
     graphEdges,
     favoriteNodeIds,
-    toggleFavoriteNode,
+    toggleFavoriteNode: persistFavorite,
     graphFocusRequest,
     focusGraphNodes,
     selectNode: setSelectedNodeId,

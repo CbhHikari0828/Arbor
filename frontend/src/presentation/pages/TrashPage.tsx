@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock3, RotateCcw, Trash2 } from "lucide-react";
 import { WorkspaceScaffold } from "@/presentation/components/WorkspaceScaffold";
 
@@ -43,15 +43,27 @@ const initialDeletedNodes: DeletedNode[] = [
 ];
 
 export function TrashPage() {
-  const [deletedNodes, setDeletedNodes] = useState(initialDeletedNodes);
+  const [deletedNodes, setDeletedNodes] = useState<DeletedNode[]>([]);
   const [notice, setNotice] = useState("");
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081";
 
-  const restoreNode = (node: DeletedNode) => {
+  useEffect(() => {
+    fetch(`${apiBaseUrl}/api/trash/nodes`)
+      .then((response) => response.ok ? response.json() : [])
+      .then((nodes) => setDeletedNodes((nodes as Array<Omit<DeletedNode, "expiresIn">>).map((node) => ({ ...node, parentTitle: node.parentTitle || "根节点", expiresIn: "30 天后清除" }))))
+      .catch(() => setDeletedNodes([]));
+  }, [apiBaseUrl]);
+
+  const restoreNode = async (node: DeletedNode) => {
+    const response = await fetch(`${apiBaseUrl}/api/trash/nodes/${node.id}/restore`, { method: "PATCH" });
+    if (!response.ok) return;
     setDeletedNodes((nodes) => nodes.filter((candidate) => candidate.id !== node.id));
     setNotice(`已恢复“${node.title}”`);
   };
 
-  const permanentlyDeleteNode = (node: DeletedNode) => {
+  const permanentlyDeleteNode = async (node: DeletedNode) => {
+    const response = await fetch(`${apiBaseUrl}/api/trash/nodes/${node.id}`, { method: "DELETE" });
+    if (!response.ok) return;
     setDeletedNodes((nodes) => nodes.filter((candidate) => candidate.id !== node.id));
     setNotice(`已永久删除“${node.title}”`);
   };
@@ -131,7 +143,7 @@ export function TrashPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-[#222222] transition hover:bg-[#eeeeee] dark:text-[#8fcea5] dark:hover:bg-[#173827]"
-                          onClick={() => restoreNode(node)}
+                          onClick={() => void restoreNode(node)}
                           type="button"
                         >
                           <RotateCcw size={15} strokeWidth={1.9} />
@@ -140,7 +152,7 @@ export function TrashPage() {
                         <button
                           aria-label={`永久删除：${node.title}`}
                           className="grid size-8 place-items-center rounded-md text-[#333333] transition hover:bg-[#eeeeee] dark:text-[#e49a89] dark:hover:bg-[#38211f]"
-                          onClick={() => permanentlyDeleteNode(node)}
+                          onClick={() => void permanentlyDeleteNode(node)}
                           title="永久删除"
                           type="button"
                         >

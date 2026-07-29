@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::domain::knowledge::{
     DiscussionBranch, DiscussionMessage, KnowledgeGraphEdge, KnowledgeNode, KnowledgeNodePosition,
     KnowledgeSummary, WorkspaceSnapshot,
+    DeletedKnowledgeNode,
 };
 
 pub async fn load_workspace_snapshot(pool: &PgPool) -> Result<WorkspaceSnapshot, sqlx::Error> {
@@ -80,6 +81,28 @@ pub async fn delete_node(pool: &PgPool, node_id: Uuid) -> Result<Vec<Uuid>, sqlx
     let result = sqlx::query("WITH RECURSIVE descendants AS (SELECT id FROM knowledge_nodes WHERE id = $1 AND deleted_at IS NULL UNION ALL SELECT n.id FROM knowledge_nodes n JOIN descendants d ON n.parent_id = d.id WHERE n.deleted_at IS NULL), changed AS (UPDATE knowledge_nodes SET deleted_at = now() WHERE id IN (SELECT id FROM descendants) RETURNING id) SELECT id FROM changed")
         .bind(node_id).fetch_all(pool).await?;
     Ok(result.into_iter().map(|row| row.get("id")).collect())
+}
+
+pub async fn set_node_favorite(pool: &PgPool, node_id: Uuid, is_favorite: bool) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query("UPDATE knowledge_nodes SET is_favorite = $2 WHERE id = $1 AND deleted_at IS NULL").bind(node_id).bind(is_favorite).execute(pool).await?.rows_affected() == 1)
+}
+
+pub async fn list_favorite_node_ids(pool: &PgPool) -> Result<Vec<Uuid>, sqlx::Error> {
+    Ok(sqlx::query_scalar("SELECT id FROM knowledge_nodes WHERE deleted_at IS NULL AND is_favorite = TRUE ORDER BY updated_at DESC").fetch_all(pool).await?)
+}
+
+pub async fn list_deleted_nodes(pool: &PgPool) -> Result<Vec<DeletedKnowledgeNode>, sqlx::Error> {
+    let rows = sqlx::query("SELECT n.id, n.title, p.title AS parent_title, n.description, n.tags, n.deleted_at FROM knowledge_nodes n LEFT JOIN knowledge_nodes p ON p.id = n.parent_id WHERE n.deleted_at IS NOT NULL ORDER BY n.deleted_at DESC")
+        .fetch_all(pool).await?;
+    Ok(rows.into_iter().map(|row| DeletedKnowledgeNode { id: row.get("id"), title: row.get("title"), parent_title: row.get("parent_title"), description: row.get("description"), tags: row.get("tags"), deleted_at: row.get("deleted_at") }).collect())
+}
+
+pub async fn restore_node(pool: &PgPool, node_id: Uuid) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query("WITH RECURSIVE descendants AS (SELECT id FROM knowledge_nodes WHERE id = $1 AND deleted_at IS NOT NULL UNION ALL SELECT n.id FROM knowledge_nodes n JOIN descendants d ON n.parent_id = d.id WHERE n.deleted_at IS NOT NULL) UPDATE knowledge_nodes SET deleted_at = NULL WHERE id IN (SELECT id FROM descendants)").bind(node_id).execute(pool).await?.rows_affected() > 0)
+}
+
+pub async fn permanently_delete_node(pool: &PgPool, node_id: Uuid) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query("DELETE FROM knowledge_nodes WHERE id = $1 AND deleted_at IS NOT NULL").bind(node_id).execute(pool).await?.rows_affected() == 1)
 }
 
 fn row_to_node(row: sqlx::postgres::PgRow) -> KnowledgeNode {
