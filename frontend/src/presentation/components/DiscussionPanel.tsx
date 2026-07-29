@@ -128,14 +128,9 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
   }, []);
 
   useEffect(() => {
-    const savedNotes = window.localStorage.getItem("arbor-discussion-notes");
-    if (!savedNotes) return;
-    try { setNotes(JSON.parse(savedNotes) as DiscussionNote[]); } catch { window.localStorage.removeItem("arbor-discussion-notes"); }
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem("arbor-discussion-notes", JSON.stringify(notes));
-  }, [notes]);
+    if (!branch) { setNotes([]); return; }
+    fetch(`${apiBaseUrl}/api/notes?branchId=${branch.id}`).then((response) => response.ok ? response.json() : []).then((items) => setNotes(items as DiscussionNote[])).catch(() => setNotes([]));
+  }, [branch?.id]);
 
   const userMessage = branch?.messages.find((message) => message.role === "user");
   const assistantMessage = branch?.messages.find((message) => message.role === "assistant");
@@ -159,14 +154,16 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
   const displayedAssistantContent = liveAssistantContent || streamedAssistantContent;
   const branchNotes = notes.filter((note) => note.branchId === branch?.id);
   const displayedBranchNotes = branchNotes.length > 0 ? branchNotes : getMockNotes(branch?.id);
-  const saveNote = () => {
+  const saveNote = async () => {
     const content = noteDraft.trim();
     const title = noteTitle.trim();
     if (!content || !title || !branch) return;
     const lastMessage = branch.messages.at(-1);
-    setNotes((currentNotes) => [{ id: crypto.randomUUID(), branchId: branch.id, messageId: lastMessage?.id ?? null, title, content, createdAt: new Date().toISOString() }, ...currentNotes]);
-    setNoteTitle("");
-    setNoteDraft("");
+    const response = await fetch(`${apiBaseUrl}/api/notes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ branchId: branch.id, messageId: lastMessage?.id ?? null, title, content }) });
+    if (!response.ok) return;
+    const savedNote = (await response.json()) as DiscussionNote;
+    setNotes((currentNotes) => [savedNote, ...currentNotes]);
+    setNoteTitle(""); setNoteDraft("");
   };
   const handleSendPrompt = async () => {
     const prompt = editor?.getText().trim();

@@ -21,7 +21,7 @@ function NotesLibrary({ branchTitles, branchNodeIds, fallbackBranchId }: { branc
   const [selectedNote, setSelectedNote] = useState<DiscussionNote | null>(null);
 
   useEffect(() => {
-    try { setNotes(JSON.parse(window.localStorage.getItem("arbor-discussion-notes") ?? "[]") as DiscussionNote[]); } catch { setNotes([]); }
+    fetch(`${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081"}/api/notes`).then((response) => response.ok ? response.json() : []).then((items) => setNotes(items as DiscussionNote[])).catch(() => setNotes([]));
   }, []);
 
   const displayedNotes = notes.length > 0 || !fallbackBranchId ? notes : [
