@@ -64,8 +64,8 @@ export function KnowledgeGraphNode({ data }: NodeProps<KnowledgeGraphNodeModel>)
             <h3 className="truncate text-[16px] font-semibold tracking-tight text-[#151b18] dark:text-[#f4f7f5]">
               {data.label}
             </h3>
-            <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-max max-w-[320px] rounded-lg border border-white/15 bg-[#171717]/95 px-3 py-2 text-left text-[13px] font-medium leading-5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm group-hover/question:block dark:border-white/10 dark:bg-[#06090d]/95">
-              <span className="absolute -top-1.5 left-4 size-3 rotate-45 border-l border-t border-white/15 bg-[#171717]/95 dark:border-white/10 dark:bg-[#06090d]/95" />
+            <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-max max-w-[320px] rounded-lg border border-white/15 bg-[#171717]/95 px-3 py-2 text-left text-[13px] font-medium leading-5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm group-hover/question:block dark:border-white/10 dark:bg-[#06090d]/95">
+              <span className="absolute -bottom-1.5 left-4 size-3 rotate-45 border-b border-r border-white/15 bg-[#171717]/95 dark:border-white/10 dark:bg-[#06090d]/95" />
               <span className="relative block break-words">{data.label}</span>
             </div>
           </div>
