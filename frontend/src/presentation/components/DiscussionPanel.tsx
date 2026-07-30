@@ -16,16 +16,12 @@ import { MarkdownMessage } from "@/presentation/components/MarkdownMessage";
 
 interface DiscussionPanelProps {
   branch: DiscussionBranch | undefined;
+  nodeId: string | undefined;
+  onFirstPrompt: (nodeId: string, content: string) => Promise<void>;
+  onConversationUpdated: () => Promise<void>;
   isMaximized: boolean;
   onToggleMaximize: () => void;
 }
-
-const configuredModels = [
-  { id: "deepseek-v5", label: "DeepSeek V5" },
-  { id: "grok-1", label: "Grok 1" },
-  { id: "gpt-4.1", label: "GPT-4.1" },
-  { id: "claude-3.7", label: "Claude 3.7" },
-] satisfies SelectableModel[];
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081";
 
@@ -54,22 +50,14 @@ interface DiscussionNote {
   createdAt: string;
 }
 
-function getMockNotes(branchId: string | undefined): DiscussionNote[] {
-  if (!branchId) return [];
-  return [
-    { id: "mock-note-1", branchId, messageId: null, title: "验证产品假设", content: "先把核心问题拆成可验证的假设，再决定下一步需要补充的上下文。", createdAt: "2026-07-28T09:20:00.000Z" },
-    { id: "mock-note-2", branchId, messageId: null, title: "下一步待办", content: "待办：补充目标用户的使用路径，并确认首个可交付版本的边界。", createdAt: "2026-07-28T09:05:00.000Z" },
-  ];
-}
-
-export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: DiscussionPanelProps) {
+export function DiscussionPanel({ branch, nodeId, onFirstPrompt, onConversationUpdated, isMaximized, onToggleMaximize }: DiscussionPanelProps) {
   const [activeTab, setActiveTab] = useState<"assistant" | "notes">("assistant");
   const [notes, setNotes] = useState<DiscussionNote[]>([]);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [isEditorEmpty, setIsEditorEmpty] = useState(true);
   const [modelConfigs, setModelConfigs] = useState<AiModelConfig[]>([]);
-  const [selectedModelId, setSelectedModelId] = useState(configuredModels[0].id);
+  const [selectedModelId, setSelectedModelId] = useState("");
   const [localUserContent, setLocalUserContent] = useState<string | null>(null);
   const [liveAssistantContent, setLiveAssistantContent] = useState("");
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
@@ -132,28 +120,14 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
     fetch(`${apiBaseUrl}/api/notes?branchId=${branch.id}`).then((response) => response.ok ? response.json() : []).then((items) => setNotes(items as DiscussionNote[])).catch(() => setNotes([]));
   }, [branch?.id]);
 
-  const userMessage = branch?.messages.find((message) => message.role === "user");
-  const assistantMessage = branch?.messages.find((message) => message.role === "assistant");
-  const streamedAssistantContent = useStreamingText(
-    assistantMessage?.content ?? "",
-    assistantMessage?.id ?? branch?.id ?? "empty-message",
-  );
-  const isAssistantStreaming = Boolean(
-    isSendingPrompt || (assistantMessage && streamedAssistantContent.length < assistantMessage.content.length),
-  );
-  const selectableModels =
-    modelConfigs.length > 0
-      ? modelConfigs
-          .filter((config) => config.isEnabled)
-          .map((config) => ({
-            id: config.id,
-            label: config.displayName || config.modelName,
-          }))
-      : configuredModels;
-  const displayedUserContent = localUserContent ?? userMessage?.content;
-  const displayedAssistantContent = liveAssistantContent || streamedAssistantContent;
+  const isAssistantStreaming = isSendingPrompt;
+  const selectableModels = modelConfigs
+    .filter((config) => config.isEnabled)
+    .map((config) => ({
+      id: config.id,
+      label: config.displayName || config.modelName,
+    }));
   const branchNotes = notes.filter((note) => note.branchId === branch?.id);
-  const displayedBranchNotes = branchNotes.length > 0 ? branchNotes : getMockNotes(branch?.id);
   const saveNote = async () => {
     const content = noteDraft.trim();
     const title = noteTitle.trim();
@@ -191,6 +165,10 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
     setIsSendingPrompt(true);
     setModelConfigError(null);
 
+    if (nodeId && !branch.messages.some((message) => message.role === "user")) {
+      try { await onFirstPrompt(nodeId, prompt); } catch { /* Chat can still continue if the graph summary update fails. */ }
+    }
+
     try {
       await streamBranchChat({
         branchId: branch.id,
@@ -200,6 +178,9 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
           setLiveAssistantContent((currentContent) => currentContent + delta);
         },
       });
+      await onConversationUpdated();
+      setLocalUserContent(null);
+      setLiveAssistantContent("");
     } catch (error) {
       setLiveAssistantContent(error instanceof Error ? error.message : "AI 回复失败");
     } finally {
@@ -273,33 +254,19 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
         ].join(" ")}
       >
         <div className={[isMaximized ? "mx-auto w-full max-w-[920px]" : "w-full", "space-y-6 text-left"].join(" ")}>
-        {displayedUserContent ? (
-          <article className="group flex w-full items-start justify-end text-sm text-[#1f1f1f] dark:text-[#e7eee9]">
-            <div className="min-w-0 max-w-[78%] rounded-2xl rounded-tr-md bg-[#eeeeee] px-4 py-3.5 text-left shadow-[0_8px_20px_rgba(0,0,0,0.045)] dark:bg-[#121a22] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
-              <p className="leading-6 text-[#222222] dark:text-[#e7eee9]">{displayedUserContent}</p>
-            </div>
-          </article>
-        ) : null}
-
-        {displayedAssistantContent ? (
-          <article className="group flex w-full items-start justify-start text-left text-sm text-[#202020] dark:text-[#eef3ef]">
-            <div className="min-w-0 flex-1">
-              <div className="pt-1 pr-1">
-                <MarkdownMessage content={displayedAssistantContent} />
-                {isAssistantStreaming ? (
-                  <span
-                    aria-label="AI 正在输出"
-                    className="mt-2 inline-block h-4 w-1.5 animate-pulse rounded-full bg-[#111111] align-middle dark:bg-[#61b979]"
-                  />
-                ) : null}
-              </div>
-            </div>
+        {branch?.messages.length ? branch.messages.map((message) => message.role === "user" ? (
+          <article className="group flex w-full items-start justify-end text-sm text-[#1f1f1f] dark:text-[#e7eee9]" key={message.id}>
+            <div className="min-w-0 max-w-[78%] rounded-2xl rounded-tr-md bg-[#eeeeee] px-4 py-3.5 text-left shadow-[0_8px_20px_rgba(0,0,0,0.045)] dark:bg-[#121a22] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]"><p className="leading-6 text-[#222222] dark:text-[#e7eee9]">{message.content}</p></div>
           </article>
         ) : (
+          <article className="group flex w-full items-start justify-start text-left text-sm text-[#202020] dark:text-[#eef3ef]" key={message.id}><div className="min-w-0 flex-1 pt-1 pr-1"><MarkdownMessage content={message.content} /></div></article>
+        )) : (
           <div className="rounded-xl border border-dashed border-[#d8d8d8] px-5 py-6 text-sm leading-7 text-[#666666] dark:border-[#303a44] dark:text-[#a8b2ad]">
             新节点已创建。输入第一个问题，开始围绕这个节点沉淀知识。
           </div>
         )}
+        {localUserContent ? <article className="flex w-full justify-end text-sm"><div className="max-w-[78%] rounded-2xl rounded-tr-md bg-[#eeeeee] px-4 py-3.5 dark:bg-[#121a22]">{localUserContent}</div></article> : null}
+        {liveAssistantContent || isAssistantStreaming ? <article className="flex w-full justify-start text-sm"><div className="min-w-0 flex-1 pt-1 pr-1"><MarkdownMessage content={liveAssistantContent} />{isAssistantStreaming ? <span aria-label="AI 正在输出" className="mt-2 inline-block h-4 w-1.5 animate-pulse rounded-full bg-[#111111] align-middle dark:bg-[#61b979]" /> : null}</div></article> : null}
 
         </div>
       </div>
@@ -307,7 +274,7 @@ export function DiscussionPanel({ branch, isMaximized, onToggleMaximize }: Discu
       {activeTab === "notes" ? (
         <NotesPanel
           branch={branch}
-          notes={displayedBranchNotes}
+          notes={branchNotes}
           noteDraft={noteDraft}
           noteTitle={noteTitle}
           onChangeTitle={setNoteTitle}
@@ -385,7 +352,7 @@ function ModelPicker({ models, value, onChange }: { models: SelectableModel[]; v
   }, [isOpen]);
 
   return <div className="relative" ref={pickerRef}>
-    <button aria-expanded={isOpen} aria-haspopup="listbox" className="flex h-8 max-w-[172px] items-center gap-1.5 rounded-full border border-[#d1d1d1] bg-[#fafafa] py-1 pl-3 pr-1 text-xs text-[#333333] shadow-[0_2px_5px_rgba(0,0,0,0.04)] transition hover:border-[#999999] hover:bg-white dark:border-[#52606b] dark:bg-[#111820] dark:text-[#dce5df] dark:hover:border-[#728079] dark:hover:bg-[#18212a]" onClick={() => setIsOpen((open) => !open)} type="button"><span className="shrink-0 text-[#777777] dark:text-[#94a09a]">模型</span><span className="min-w-0 truncate font-semibold text-[#111111] dark:text-[#edf3ef]">{selectedLabel}</span><span className={`grid size-6 shrink-0 place-items-center rounded-full bg-[#e9e9e9] text-[#555555] transition duration-200 dark:bg-[#26312b] dark:text-[#cbd7d0] ${isOpen ? "rotate-180" : ""}`}><ChevronDown size={14} /></span></button>
+    <button aria-expanded={isOpen} aria-haspopup="listbox" className="flex h-8 max-w-[172px] items-center gap-1.5 rounded-full border border-[#d1d1d1] bg-[#fafafa] py-1 pl-3 pr-1 text-xs text-[#333333] shadow-[0_2px_5px_rgba(0,0,0,0.04)] transition hover:border-[#999999] hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#52606b] dark:bg-[#111820] dark:text-[#dce5df] dark:hover:border-[#728079] dark:hover:bg-[#18212a]" disabled={models.length === 0} onClick={() => setIsOpen((open) => !open)} type="button"><span className="shrink-0 text-[#777777] dark:text-[#94a09a]">模型</span><span className="min-w-0 truncate font-semibold text-[#111111] dark:text-[#edf3ef]">{models.length === 0 ? "未配置" : selectedLabel}</span><span className={`grid size-6 shrink-0 place-items-center rounded-full bg-[#e9e9e9] text-[#555555] transition duration-200 dark:bg-[#26312b] dark:text-[#cbd7d0] ${isOpen ? "rotate-180" : ""}`}><ChevronDown size={14} /></span></button>
     {isOpen ? <div className="absolute bottom-[calc(100%+8px)] left-0 z-40 w-56 overflow-hidden rounded-xl border border-[#cacaca] bg-white p-1.5 shadow-[0_18px_38px_rgba(0,0,0,0.18)] dark:border-[#3b4a42] dark:bg-[#131c19]" role="listbox">{models.map((model) => <button aria-selected={model.id === value} className={`flex h-9 w-full items-center rounded-lg px-3 text-left text-sm transition ${model.id === value ? "bg-[#181818] text-white dark:bg-[#5b9d6c]" : "text-[#303030] hover:bg-[#efefef] dark:text-[#dce7df] dark:hover:bg-[#223028]"}`} key={model.id} onClick={() => { onChange(model.id); setIsOpen(false); }} role="option" type="button">{model.label}</button>)}</div> : null}
   </div>;
 }

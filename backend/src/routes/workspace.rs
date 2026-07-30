@@ -17,6 +17,7 @@ pub fn router() -> Router<AppState> {
         .route("/nodes/{node_id}", delete(delete_node))
         .route("/nodes/favorites", get(list_favorites))
         .route("/nodes/{node_id}/favorite", patch(set_favorite))
+        .route("/nodes/{node_id}/description", patch(update_node_description))
         .route("/trash/nodes", get(list_deleted_nodes))
         .route("/trash/nodes/{node_id}/restore", patch(restore_node))
         .route("/trash/nodes/{node_id}", delete(permanently_delete_node))
@@ -34,6 +35,7 @@ struct CreateChildNodeResponse { node: crate::domain::knowledge::KnowledgeNode, 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DeleteNodeResponse { deleted_node_ids: Vec<Uuid> }
+#[derive(Deserialize)] struct DescriptionRequest { description: String }
 #[derive(Deserialize)] #[serde(rename_all = "camelCase")] struct FavoriteRequest { is_favorite: bool }
 
 async fn get_workspace_snapshot(
@@ -65,6 +67,7 @@ async fn delete_node(State(state): State<AppState>, Path(node_id): Path<Uuid>) -
 }
 async fn list_favorites(State(state): State<AppState>) -> Result<Json<Vec<Uuid>>, AppError> { Ok(Json(workspace_service::list_favorite_node_ids(&state.db).await?)) }
 async fn set_favorite(State(state): State<AppState>, Path(node_id): Path<Uuid>, Json(input): Json<FavoriteRequest>) -> Result<(), AppError> { if workspace_service::set_node_favorite(&state.db, node_id, input.is_favorite).await? { Ok(()) } else { Err(AppError::NotFound("node")) } }
+async fn update_node_description(State(state): State<AppState>, Path(node_id): Path<Uuid>, Json(input): Json<DescriptionRequest>) -> Result<(), AppError> { if input.description.trim().is_empty() { return Err(AppError::BadRequest("description")); } if workspace_service::update_node_description(&state.db, node_id, input.description.trim()).await? { Ok(()) } else { Err(AppError::NotFound("node")) } }
 async fn list_deleted_nodes(State(state): State<AppState>) -> Result<Json<Vec<crate::domain::knowledge::DeletedKnowledgeNode>>, AppError> { Ok(Json(workspace_service::list_deleted_nodes(&state.db).await?)) }
 async fn restore_node(State(state): State<AppState>, Path(node_id): Path<Uuid>) -> Result<(), AppError> { if workspace_service::restore_node(&state.db, node_id).await? { Ok(()) } else { Err(AppError::NotFound("node")) } }
 async fn permanently_delete_node(State(state): State<AppState>, Path(node_id): Path<Uuid>) -> Result<(), AppError> { if workspace_service::permanently_delete_node(&state.db, node_id).await? { Ok(()) } else { Err(AppError::NotFound("node")) } }

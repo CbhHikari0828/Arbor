@@ -39,6 +39,7 @@ export function WorkspaceScaffold({ children }: WorkspaceScaffoldProps) {
         selectedNodeId={workspace.selectedNode?.id}
         onSelectNode={workspace.selectNode}
         onCreateRootNode={workspace.createRootNode}
+        onDeleteNode={workspace.deleteNode}
         isCreatingRootNode={workspace.isCreatingRootNode}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode((value) => !value)}

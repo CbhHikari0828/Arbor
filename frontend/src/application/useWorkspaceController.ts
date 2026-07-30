@@ -66,6 +66,8 @@ export interface WorkspaceController {
   createChildNode: (parentId: string) => Promise<void>;
   isCreatingChildNode: boolean;
   deleteNode: (nodeId: string) => Promise<void>;
+  setNodeDescription: (nodeId: string, description: string) => Promise<void>;
+  refreshWorkspace: () => Promise<void>;
   isDeletingNode: boolean;
 }
 
@@ -186,6 +188,14 @@ export function useWorkspaceController(): WorkspaceController {
     [createRootNodeMutation, focusGraphNodes, queryClient, setSelectedNodeId],
   );
 
+  const setNodeDescription = useCallback(async (nodeId: string, description: string) => {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081";
+    const response = await fetch(`${apiBaseUrl}/api/nodes/${nodeId}/description`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description }) });
+    if (!response.ok) throw new Error("Failed to update node description");
+    await queryClient.invalidateQueries({ queryKey: ["workspace-snapshot"] });
+  }, [queryClient]);
+  const refreshWorkspace = useCallback(() => queryClient.invalidateQueries({ queryKey: ["workspace-snapshot"] }), [queryClient]);
+
   const childCountByNodeId = useMemo(() => {
     const counts = new Map<string, number>();
 
@@ -200,9 +210,28 @@ export function useWorkspaceController(): WorkspaceController {
     return counts;
   }, [visibleNodes]);
 
+  const conversationPreviewByNodeId = useMemo(() => {
+    const previews = new Map<string, { question: string; answer: string }>();
+
+    snapshot?.branches.forEach((branch) => {
+      if (!branch.isActive || previews.has(branch.nodeId)) {
+        return;
+      }
+
+      const question = branch.messages.find((message) => message.role === "user")?.content.trim() ?? "";
+      const answer = branch.messages.find((message) => message.role === "assistant")?.content.trim() ?? "";
+      previews.set(branch.nodeId, { question, answer: toNodePreview(answer) });
+    });
+
+    return previews;
+  }, [snapshot?.branches]);
+
   const graphNodes = useMemo<Node[]>(
     () =>
-      visibleNodes.map((node) => ({
+      visibleNodes.map((node) => {
+        const conversation = conversationPreviewByNodeId.get(node.id);
+
+        return {
         id: node.id,
         position: node.position,
         type: "knowledgeNode",
@@ -210,8 +239,8 @@ export function useWorkspaceController(): WorkspaceController {
         height: 170,
         data: {
           nodeId: node.id,
-          label: node.title,
-          description: node.description,
+          label: conversation?.question || node.title,
+          description: conversation?.answer || node.description,
           status: node.status,
           childCount: childCountByNodeId.get(node.id) ?? 0,
           isRoot: node.parentId === null,
@@ -221,9 +250,11 @@ export function useWorkspaceController(): WorkspaceController {
           onDeleteNode: deleteNode,
           onToggleFavorite: toggleFavoriteNode,
         },
-      })),
+        };
+      }),
     [
       childCountByNodeId,
+      conversationPreviewByNodeId,
       createChildNode,
       deleteNode,
       favoriteNodeIds,
@@ -246,29 +277,32 @@ export function useWorkspaceController(): WorkspaceController {
             source: edge.source,
             target: edge.target,
             label: edge.label,
-            type: "smoothstep",
+            type: "default",
             animated: edge.target === selectedNode?.id,
+            interactionWidth: 24,
             markerEnd: {
               type: MarkerType.ArrowClosed,
               width: 8,
               height: 8,
               color,
             },
-            labelBgPadding: [8, 4],
-            labelBgBorderRadius: 8,
+            labelBgPadding: [9, 5],
+            labelBgBorderRadius: 10,
             labelBgStyle: {
               fill: "var(--edge-label-bg)",
-              fillOpacity: 1,
+              fillOpacity: 0.94,
             },
             labelStyle: {
               fill: "var(--edge-label-text)",
-              fontSize: 12,
-              fontWeight: 500,
+              fontSize: 11,
+              fontWeight: 600,
             },
             style: {
               stroke: color,
               strokeDasharray: isSummaryEdge ? "4 4" : undefined,
-              strokeWidth: edge.target === selectedNode?.id ? 2 : 1.6,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+              strokeWidth: edge.target === selectedNode?.id ? 2.2 : 1.7,
             },
           };
         }) ?? [],
@@ -300,7 +334,17 @@ export function useWorkspaceController(): WorkspaceController {
     isCreatingChildNode: createChildNodeMutation.isPending,
     deleteNode,
     isDeletingNode: deleteNodeMutation.isPending,
+    setNodeDescription,
+    refreshWorkspace,
   };
+}
+
+function toNodePreview(content: string) {
+  return content
+    .replace(/```[\s\S]*?```/g, "代码片段")
+    .replace(/[`*_>#-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function findRootNode(node: KnowledgeNode, nodes: KnowledgeNode[]) {

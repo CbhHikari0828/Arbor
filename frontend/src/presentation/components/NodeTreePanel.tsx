@@ -23,7 +23,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import type { KnowledgeNode } from "@/domain/knowledge/types";
 
 interface NodeTreePanelProps {
@@ -31,6 +31,7 @@ interface NodeTreePanelProps {
   selectedNodeId: string | undefined;
   onSelectNode: (nodeId: string) => void;
   onCreateRootNode: (title: string) => Promise<void>;
+  onDeleteNode: (nodeId: string) => Promise<void>;
   isCreatingRootNode: boolean;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
@@ -74,15 +75,18 @@ export function NodeTreePanel({
   selectedNodeId,
   onSelectNode,
   onCreateRootNode,
+  onDeleteNode,
   isCreatingRootNode,
   isDarkMode,
   onToggleDarkMode,
 }: NodeTreePanelProps) {
+  const navigate = useNavigate();
   const rootNodes = useMemo(() => nodes.filter((node) => node.parentId === null), [nodes]);
   const [draftTitle, setDraftTitle] = useState("新知识树");
   const [isRenamingNewNode, setIsRenamingNewNode] = useState(false);
   const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(() => new Set());
+  const [actionNodeId, setActionNodeId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window === "undefined") {
       return DEFAULT_SIDEBAR_WIDTH;
@@ -251,6 +255,11 @@ export function NodeTreePanel({
     });
   };
 
+  const selectAndOpenNode = (nodeId: string) => {
+    onSelectNode(nodeId);
+    navigate(`/workspace?node=${nodeId}`);
+  };
+
   const handleResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !event.isPrimary) {
       return;
@@ -374,7 +383,10 @@ export function NodeTreePanel({
               node={node}
               nodes={nodes}
               collapsedNodeIds={collapsedNodeIds}
-              onSelectNode={onSelectNode}
+              onSelectNode={selectAndOpenNode}
+              onDeleteNode={onDeleteNode}
+              actionNodeId={actionNodeId}
+              onToggleActions={(nodeId) => setActionNodeId((currentId) => currentId === nodeId ? null : nodeId)}
               onToggleNode={toggleNode}
               selectedNodeId={selectedNodeId}
               isExpanded={!collapsedNodeIds.has(node.id)}
@@ -452,6 +464,9 @@ function TreeRow({
   collapsedNodeIds,
   selectedNodeId,
   onSelectNode,
+  onDeleteNode,
+  actionNodeId,
+  onToggleActions,
   onToggleNode,
   isExpanded,
 }: {
@@ -461,6 +476,9 @@ function TreeRow({
   collapsedNodeIds: Set<string>;
   selectedNodeId: string | undefined;
   onSelectNode: (nodeId: string) => void;
+  onDeleteNode: (nodeId: string) => Promise<void>;
+  actionNodeId: string | null;
+  onToggleActions: (nodeId: string) => void;
   onToggleNode: (nodeId: string) => void;
   isExpanded: boolean;
 }) {
@@ -470,6 +488,11 @@ function TreeRow({
   const handleRowClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (children.length > 0 && (event.target as HTMLElement).closest("[data-tree-toggle]")) {
       onToggleNode(node.id);
+      return;
+    }
+
+    if ((event.target as HTMLElement).closest("[data-tree-actions]")) {
+      onToggleActions(node.id);
       return;
     }
 
@@ -511,9 +534,19 @@ function TreeRow({
         )}
         <span className="min-w-0 flex-1 truncate">{node.title}</span>
         {isRoot ? (
-          <MoreHorizontal size={15} className="shrink-0 text-[#747970] opacity-80 dark:text-[#d7dfda]" />
+          <span data-tree-actions className="grid size-6 shrink-0 place-items-center rounded-md text-[#747970] hover:bg-[#dddddd] dark:text-[#d7dfda] dark:hover:bg-[#202a33]">
+            <MoreHorizontal size={15} />
+          </span>
         ) : null}
       </button>
+
+      {actionNodeId === node.id ? (
+        <div className="ml-8 mt-1 flex justify-end">
+          <button className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-[#b42318] transition hover:bg-[#fff0ed] dark:text-[#ffad96] dark:hover:bg-[#38211f]" onClick={() => void onDeleteNode(node.id)} type="button">
+            <Trash2 size={13} />删除节点
+          </button>
+        </div>
+      ) : null}
 
       {children.length > 0 && isExpanded ? (
         <div className="relative ml-5 border-l border-[#d8d8d8] dark:border-[#2b343d]">
@@ -525,6 +558,9 @@ function TreeRow({
               nodes={nodes}
               collapsedNodeIds={collapsedNodeIds}
               onSelectNode={onSelectNode}
+              onDeleteNode={onDeleteNode}
+              actionNodeId={actionNodeId}
+              onToggleActions={onToggleActions}
               onToggleNode={onToggleNode}
               selectedNodeId={selectedNodeId}
               isExpanded={!collapsedNodeIds.has(child.id)}

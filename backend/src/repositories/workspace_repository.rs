@@ -43,7 +43,7 @@ pub async fn create_root_node(pool: &PgPool, title: &str) -> Result<(KnowledgeNo
         "INSERT INTO knowledge_nodes (title, description, tags, position_x, position_y) VALUES ($1, $2, $3, 0, 150) RETURNING id, parent_id, title, description, tags, status::text AS status, position_x, position_y, updated_at",
     )
     .bind(title)
-    .bind("New root node, ready for a knowledge exploration.")
+    .bind("")
     .bind(vec!["root".to_owned()])
     .fetch_one(&mut *transaction)
     .await?;
@@ -59,17 +59,22 @@ pub async fn create_root_node(pool: &PgPool, title: &str) -> Result<(KnowledgeNo
 
 pub async fn create_child_node(pool: &PgPool, parent_id: Uuid, title: &str) -> Result<(KnowledgeNode, DiscussionBranch, KnowledgeGraphEdge), sqlx::Error> {
     let mut transaction = pool.begin().await?;
-    let parent = sqlx::query("SELECT position_x, position_y FROM knowledge_nodes WHERE id = $1 AND deleted_at IS NULL")
+    // Lock the parent so concurrent child creation receives distinct sequence numbers.
+    let parent = sqlx::query("SELECT position_x, position_y FROM knowledge_nodes WHERE id = $1 AND deleted_at IS NULL FOR UPDATE")
         .bind(parent_id).fetch_optional(&mut *transaction).await?;
     let Some(parent) = parent else { return Err(sqlx::Error::RowNotFound); };
-    let sibling_count: i64 = sqlx::query_scalar("SELECT count(*) FROM knowledge_nodes WHERE parent_id = $1 AND deleted_at IS NULL")
+    let sibling_count: i64 = sqlx::query_scalar("SELECT count(*) FROM knowledge_nodes WHERE parent_id = $1")
         .bind(parent_id).fetch_one(&mut *transaction).await?;
+    let title = match title.trim() {
+        "" | "New node" | "新节点" => format!("子节点 {}", sibling_count + 1),
+        title => title.to_owned(),
+    };
     let node = sqlx::query("INSERT INTO knowledge_nodes (parent_id, title, description, tags, position_x, position_y) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, parent_id, title, description, tags, status::text AS status, position_x, position_y, updated_at")
-        .bind(parent_id).bind(title).bind("A new direction expanded from its parent node.").bind(vec!["child".to_owned()])
-        .bind(parent.get::<f64, _>("position_x") + 390.0).bind(parent.get::<f64, _>("position_y") + sibling_count as f64 * 170.0)
+        .bind(parent_id).bind(title).bind("").bind(vec!["child".to_owned()])
+        .bind(parent.get::<f64, _>("position_x") + 440.0).bind(parent.get::<f64, _>("position_y") + sibling_count as f64 * 220.0)
         .fetch_one(&mut *transaction).await?;
     let node = row_to_node(node);
-    let edge = sqlx::query("INSERT INTO knowledge_edges (source_id, target_id, label) VALUES ($1, $2, 'expand') RETURNING id, source_id, target_id, label")
+    let edge = sqlx::query("INSERT INTO knowledge_edges (source_id, target_id, label) VALUES ($1, $2, '展开') RETURNING id, source_id, target_id, label")
         .bind(parent_id).bind(node.id).fetch_one(&mut *transaction).await?;
     let branch = sqlx::query("INSERT INTO discussion_branches (node_id, title) VALUES ($1, $2) RETURNING id, node_id, title, is_active, created_from_message_id")
         .bind(node.id).bind("New node discussion").fetch_one(&mut *transaction).await?;
@@ -85,6 +90,10 @@ pub async fn delete_node(pool: &PgPool, node_id: Uuid) -> Result<Vec<Uuid>, sqlx
 
 pub async fn set_node_favorite(pool: &PgPool, node_id: Uuid, is_favorite: bool) -> Result<bool, sqlx::Error> {
     Ok(sqlx::query("UPDATE knowledge_nodes SET is_favorite = $2 WHERE id = $1 AND deleted_at IS NULL").bind(node_id).bind(is_favorite).execute(pool).await?.rows_affected() == 1)
+}
+
+pub async fn update_node_description(pool: &PgPool, node_id: Uuid, description: &str) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query("UPDATE knowledge_nodes SET description = $2 WHERE id = $1 AND deleted_at IS NULL").bind(node_id).bind(description).execute(pool).await?.rows_affected() == 1)
 }
 
 pub async fn list_favorite_node_ids(pool: &PgPool) -> Result<Vec<Uuid>, sqlx::Error> {

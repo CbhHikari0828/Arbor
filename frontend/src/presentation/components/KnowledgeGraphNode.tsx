@@ -22,7 +22,7 @@ type KnowledgeGraphNodeModel = Node<KnowledgeGraphNodeData, "knowledgeNode">;
 export function KnowledgeGraphNode({ data }: NodeProps<KnowledgeGraphNodeModel>) {
   const status = getStatusPresentation(data.status);
   const Icon = data.isRoot ? Sprout : data.status === "summarized" ? FileText : GitBranch;
-  const displayCount = getDisplayCount(data.label, data.childCount, data.isRoot);
+  const displayCount = data.isRoot ? data.childCount + 1 : data.childCount;
 
   return (
     <div
@@ -60,13 +60,19 @@ export function KnowledgeGraphNode({ data }: NodeProps<KnowledgeGraphNodeModel>)
           <span className={["grid size-8 shrink-0 place-items-center rounded-xl", status.iconClass].join(" ")}>
             <Icon size={18} />
           </span>
-          <h3 className="truncate text-[16px] font-semibold tracking-tight text-[#151b18] dark:text-[#f4f7f5]">
-            {data.label}
-          </h3>
+          <div className="group/question relative min-w-0 flex-1">
+            <h3 className="truncate text-[16px] font-semibold tracking-tight text-[#151b18] dark:text-[#f4f7f5]">
+              {data.label}
+            </h3>
+            <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-max max-w-[320px] rounded-lg border border-white/15 bg-[#171717]/95 px-3 py-2 text-left text-[13px] font-medium leading-5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm group-hover/question:block dark:border-white/10 dark:bg-[#06090d]/95">
+              <span className="absolute -top-1.5 left-4 size-3 rotate-45 border-l border-t border-white/15 bg-[#171717]/95 dark:border-white/10 dark:bg-[#06090d]/95" />
+              <span className="relative block break-words">{data.label}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <p className="min-h-[48px] text-[14px] leading-6 text-[#666666] dark:text-[#aab5af]">
+      <p className="line-clamp-2 min-h-[48px] text-[14px] leading-6 text-[#666666] dark:text-[#aab5af]">
         {data.description}
       </p>
 
@@ -120,7 +126,7 @@ function getDisplayCount(label: string, childCount: number, isRoot: boolean) {
     动态总结: 2,
   };
 
-  return screenshotCounts[label] ?? (isRoot ? childCount + 1 : childCount);
+  return isRoot ? childCount + 1 : childCount;
 }
 
 function getStatusPresentation(status: KnowledgeNodeStatus) {

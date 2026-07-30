@@ -68,6 +68,7 @@ export function WorkspacePage() {
         selectedNodeId={workspace.selectedNode?.id}
         onSelectNode={workspace.selectNode}
         onCreateRootNode={workspace.createRootNode}
+        onDeleteNode={workspace.deleteNode}
         isCreatingRootNode={workspace.isCreatingRootNode}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode((value) => !value)}
@@ -145,6 +146,9 @@ export function WorkspacePage() {
 
           <DiscussionPanel
             branch={workspace.selectedBranch}
+            nodeId={workspace.selectedNode?.id}
+            onFirstPrompt={workspace.setNodeDescription}
+            onConversationUpdated={workspace.refreshWorkspace}
             isMaximized={isDiscussionMaximized}
             onToggleMaximize={() => setIsDiscussionMaximized((value) => !value)}
           />

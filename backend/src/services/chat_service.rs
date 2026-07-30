@@ -65,7 +65,7 @@ pub fn stream_branch_chat(
                 return;
             }
         };
-        let messages = match chat_repository::list_provider_messages(&state.db, branch_id, 24).await {
+        let inherited_messages = match chat_repository::list_inherited_provider_messages(&state.db, branch_id, 16).await {
             Ok(messages) => messages,
             Err(error) => {
                 yield Ok(sse_event("error", &ChatErrorEvent {
@@ -74,6 +74,16 @@ pub fn stream_branch_chat(
                 return;
             }
         };
+        let current_messages = match chat_repository::list_provider_messages(&state.db, branch_id, 24).await {
+            Ok(messages) => messages,
+            Err(error) => { yield Ok(sse_event("error", &ChatErrorEvent { message: error.to_string() })); return; }
+        };
+        let mut messages = Vec::new();
+        if !inherited_messages.is_empty() {
+            messages.push(crate::domain::chat::ProviderChatMessage { role: "system".to_string(), content: "The following messages are inherited context from the parent knowledge nodes. Use them as background for the current child-node discussion.".to_string() });
+            messages.extend(inherited_messages);
+        }
+        messages.extend(current_messages);
         let model_config_id = model_config.id;
         let mut assistant_content = String::new();
         let provider_stream = openai_compatible_provider::stream_chat(
